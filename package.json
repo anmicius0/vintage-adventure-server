@@ -2,13 +2,24 @@
   "name": "vintage-adventure-server-elysia",
   "version": "1.0.50",
   "scripts": {
+    "start": "bun src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "bun run --watch src/index.ts"
   },
   "dependencies": {
-    "elysia": "latest"
+    "@deepgram/sdk": "^3.3.2",
+    "@elysiajs/cors": "^1.0.2",
+    "@google/generative-ai": "^0.11.3",
+    "@googlemaps/google-maps-services-js": "^3.4.0",
+    "@million/lint": "latest",
+    "core-js": "^3.37.1",
+    "elysia": "latest",
+    "ffmpeg-static": "^5.2.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "sharp": "^0.33.4"
   },
   "devDependencies": {
+    "@types/fluent-ffmpeg": "latest",
     "bun-types": "latest"
   },
   "module": "src/index.js"
