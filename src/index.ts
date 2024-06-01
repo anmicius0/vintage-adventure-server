@@ -72,34 +72,34 @@ const app = new Elysia()
           await deepgram.listen.prerecorded.transcribeFile(
             Buffer.from(await audio.arrayBuffer()),
             {
-              model: "whisper",
-              language: "zh",
+              model: "nova-2",
+              language: "zh-TW",
             }
           );
         if (error) throw new Error(error.message);
         console.log(result);
         transcript = result?.results?.channels[0]?.alternatives[0]?.transcript;
       } else if (language === "tw") {
-        const data = {
-          token: TW_STT,
-          audio_data: Buffer.from(await audio.arrayBuffer()).toString("base64"),
-          audio_format: "webm",
-          service_id: "A018",
-          mode: "Segmentation",
-        };
+          const data = {
+              token: TW_STT,
+              audio_data: Buffer.from(await audio.arrayBuffer()).toString("base64"),
+              audio_format: "webm",
+              service_id: "A018",
+              mode: "Segmentation",
+          };
 
-        const response = await fetch("http://140.116.245.149:2802/asr", {
-          method: "POST",
-          body: JSON.stringify(data),
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-        if (!response.ok) throw new Error("Failed to transcribe audio");
-        const { words_list } = (await response.json()) as {
-          words_list: string[];
-        };
-        transcript = words_list[0];
+          const response = await fetch("http://140.116.245.149:2802/asr", {
+              method: "POST",
+              body: JSON.stringify(data),
+              headers: {
+                  "Content-Type": "application/json",
+              },
+          });
+          if (!response.ok) throw new Error("Failed to transcribe audio");
+          const {words_list} = (await response.json()) as {
+              words_list: string[];
+          };
+          transcript = words_list[0].replace(/\s/g, "");
       } else {
         throw new Error("Unsupported language");
       }
