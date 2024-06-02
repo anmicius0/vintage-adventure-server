@@ -7,17 +7,12 @@ import sharp from "sharp";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import fs from "fs";
+import { config } from "./config"
 
 const port = (process.env.PORT || 3000) as number;
-const GMAPS_KEY = process.env.GMAPS_KEY!;
-const DEEPGRAM_KEY = process.env.DEEPGRAM_KEY!;
-const TW_STT = process.env.TW_STT!;
-const GEMINI_KEY = process.env.GEMINI_KEY!;
-const STABILITY_KEY = process.env.STABILITY_KEY!;
-
 const gmaps = new Client();
-const deepgram = createClient(DEEPGRAM_KEY);
-const gemini = new GoogleGenerativeAI(GEMINI_KEY);
+const deepgram = createClient(config.DEEPGRAM_KEY);
+const gemini = new GoogleGenerativeAI(config.GEMINI_KEY);
 ffmpeg.setFfmpegPath(ffmpegPath!);
 
 const app = new Elysia()
@@ -28,7 +23,7 @@ const app = new Elysia()
             const {query} = body;
             const response = await gmaps.findPlaceFromText({
                 params: {
-                    key: GMAPS_KEY,
+                    key: config.GMAPS_KEY,
                     fields: ["geometry"],
                     input: query,
                     inputtype: PlaceInputType.textQuery,
@@ -49,7 +44,7 @@ const app = new Elysia()
         "/static-streetview",
         async ({body}) => {
             const {panoID, heading, pitch} = body;
-            const url = `https://maps.googleapis.com/maps/api/streetview?size=640x640&key=${GMAPS_KEY}&pano=${panoID}&heading=${heading}&pitch=${pitch}`;
+            const url = `https://maps.googleapis.com/maps/api/streetview?size=640x640&key=${config.GMAPS_KEY}&pano=${panoID}&heading=${heading}&pitch=${pitch}`;
             const gmaps_res = await fetch((await fetch(url)).url);
             return await gmaps_res.blob();
         },
@@ -79,27 +74,6 @@ const app = new Elysia()
                 if (error) throw new Error(error.message);
                 console.log(result);
                 transcript = result?.results?.channels[0]?.alternatives[0]?.transcript;
-            } else if (language === "tw") {
-                const data = {
-                    token: TW_STT,
-                    audio_data: Buffer.from(await audio.arrayBuffer()).toString("base64"),
-                    audio_format: "webm",
-                    service_id: "A018",
-                    mode: "Segmentation",
-                };
-
-                const response = await fetch("http://140.116.245.149:2802/asr", {
-                    method: "POST",
-                    body: JSON.stringify(data),
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                });
-                if (!response.ok) throw new Error("Failed to transcribe audio");
-                const {words_list} = (await response.json()) as {
-                    words_list: string[];
-                };
-                transcript = words_list[0].replace(/\s/g, "");
             } else {
                 throw new Error("Unsupported language");
             }
@@ -154,7 +128,7 @@ const app = new Elysia()
                 {
                     method: "POST",
                     headers: {
-                        Authorization: `Bearer ${STABILITY_KEY}`,
+                        Authorization: `Bearer ${config.STABILITY_KEY}`,
                         accept: "image/png",
                     },
                     body: formData,
@@ -180,7 +154,8 @@ const app = new Elysia()
     .post(
         "/to-video",
         async ({body}) => {
-            const {image, audio} = body;
+            const {image, audio, prompt} = body;
+            const wrappedPrompt = (prompt.match(/.{1,30}/g) ?? []).join('\n');
 
             // Combine jpeg and audio
             await Bun.write("temp-image.jpeg", image);
@@ -191,7 +166,7 @@ const app = new Elysia()
                     .inputFPS(30)
                     .input("temp-audio.webm")
                     .outputOptions([
-                        '-vf', "zoompan=z='min(max(zoom,pzoom)+0.0055,5.5)':d=30:x='iw/2':y='ih/2':s=1024x1024"
+                        `-vf zoompan=z='max(zoom,pzoom)+0.001':500:x='iw/2':y='ih/2':s=1024x1024`,
                     ])
                     .output("output.mp4")
                     .videoCodec("libx264")
@@ -199,7 +174,8 @@ const app = new Elysia()
                     .on("end", () => {
                         console.log("Finished processing");
                         fs.unlinkSync("temp-image.jpeg");
-                        fs.unlinkSync("temp-audio.webm");
+                        fs.unlinkSync("temp-audi" +
+                            "o.webm");
                         resolve();
                     })
                     .on("error", reject)
@@ -209,7 +185,7 @@ const app = new Elysia()
             return Buffer.from(await Bun.file("output.mp4").arrayBuffer());
         },
         {
-            body: t.Object({image: t.File(), audio: t.File()}),
+            body: t.Object({image: t.File(), audio: t.File(), prompt: t.String()}),
         }
     )
     .onError(({code}) => {
