@@ -8,6 +8,7 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import fs from "fs";
 
+
 const port = (process.env.PORT || 3000) as number;
 const GMAPS_KEY = process.env.GMAPS_KEY!;
 const DEEPGRAM_KEY = process.env.DEEPGRAM_KEY!;
@@ -180,7 +181,8 @@ const app = new Elysia()
     .post(
         "/to-video",
         async ({body}) => {
-            const {image, audio} = body;
+            const {image, audio, prompt} = body;
+            const wrappedPrompt = (prompt.match(/.{1,30}/g) ?? []).join('\n');
 
             // Combine jpeg and audio
             await Bun.write("temp-image.jpeg", image);
@@ -191,7 +193,7 @@ const app = new Elysia()
                     .inputFPS(30)
                     .input("temp-audio.webm")
                     .outputOptions([
-                        '-vf', "zoompan=z='min(max(zoom,pzoom)+0.0055,5.5)':d=30:x='iw/2':y='ih/2':s=1024x1024"
+                        `-vf zoompan=z='max(zoom,pzoom)+0.001':500:x='iw/2':y='ih/2':s=1024x1024`,
                     ])
                     .output("output.mp4")
                     .videoCodec("libx264")
@@ -199,7 +201,8 @@ const app = new Elysia()
                     .on("end", () => {
                         console.log("Finished processing");
                         fs.unlinkSync("temp-image.jpeg");
-                        fs.unlinkSync("temp-audio.webm");
+                        fs.unlinkSync("temp-audi" +
+                            "o.webm");
                         resolve();
                     })
                     .on("error", reject)
@@ -209,7 +212,7 @@ const app = new Elysia()
             return Buffer.from(await Bun.file("output.mp4").arrayBuffer());
         },
         {
-            body: t.Object({image: t.File(), audio: t.File()}),
+            body: t.Object({image: t.File(), audio: t.File(), prompt: t.String()}),
         }
     )
     .onError(({code}) => {
